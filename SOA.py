@@ -27,26 +27,28 @@ class SOA:
     # 一个非常接近0的数, 防止除0操作
     delta = np.spacing(1)
 
-    def __init__(self, dim: int, max_iter: int, population_size: int, lower_bound, upper_bound, fitness_func):
+    def __init__(self, dim: int, max_iter: int, population_size: int, lower_bound, upper_bound, fitness_func, **kwargs):
         """
         初始化SOA算法的参数
         :param dim: 维度(即解决方案的维度, 多少个参数需要处理)
         :param max_iter: 最大迭代次数
-        :param population_size: 种群大小
+        :param population_size: 种群大小,注意要是偶数
         :param lower_bound: 下界
         :param upper_bound: 上界
         :param fitness_func: 适应度函数
         """
+        assert population_size % 2 == 0, "种群大小必须是偶数"
         self.dim = dim
         self.max_iter = max_iter
         self.population_size = population_size
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.fitness_func = fitness_func
+        self.kwargs = kwargs
         # 初始化种群, shape: (population_size, ndim)
         self.population = np.random.uniform(self.lower_bound, self.upper_bound, (self.population_size, self.dim))
         # 初始化个体适应度, shape: (population_size,)
-        self.fitness: np.ndarray = self.fitness_func(self.population)
+        self.fitness: np.ndarray = self.fitness_func(self.population, **self.kwargs)
         # 得到食物的位置，其实就是当前全局最佳适应度的位置对应的解决方案, shape: (ndim,1)
         self.food_position = self.population[self.fitness.argmin()]
         # 分离种群: 雄性, 雌性
@@ -228,12 +230,6 @@ class SOA:
         #         fight_m = exp(-self.female_best_fitness / (self.male_fitness[i] + self.delta))
         #         new_population[i] = population[i] + self.c3 * fight_m * np.random.random(self.dim) * (
         #                 food_quality * self.male_best_fitness_solution - population[i])
-        # else:
-        #     for i in range(population_size):
-        #         # 先计算当前雌性的战斗的能力
-        #         fight_f = exp(-self.male_best_fitness / (self.female_fitness[i] + self.delta))
-        #         new_population[i] = population[i] + self.c3 * fight_f * np.random.random(self.dim) * (
-        #                 food_quality * self.female_best_fitness_solution - population[i])
 
     def __mate(self, population: np.ndarray, new_population: np.ndarray, another_population: np.ndarray,
                food_quality: float, is_male: bool):
@@ -284,7 +280,7 @@ class SOA:
         new_population[flag_low] = self.lower_bound
         new_population[flag_high] = self.upper_bound
         # 计算种群中每一个个体的适应度（这个是被更新过位置的）, shape: (population_size,)
-        new_fitness = self.fitness_func(new_population)
+        new_fitness = self.fitness_func(new_population, **self.kwargs)
         # 判断是否需要更改当前个体的历史最佳适应度
         flag = new_fitness < fitness
         fitness[flag] = new_fitness[flag]
@@ -298,11 +294,12 @@ def custom_fitness_func(x: np.ndarray) -> np.ndarray:
     :return: 适应度
     """
     # axis=1表示按行求和, 即计算每个个体的适应度
-    return (x ** 4).sum(axis=1)
+    # return (x ** 4).sum(axis=1)
+    return np.sin(x).sum(axis=1)
 
 
 if __name__ == '__main__':
-    soa = SOA(10, 1000, 30, -100, 100, custom_fitness_func)
+    soa = SOA(4, 1000, 30, 0, 2 * np.pi, custom_fitness_func)
     food, global_fitness, gene_best_fitness = soa.snake_optimization()
     plt.plot(gene_best_fitness)
     plt.title("SOA算法")
